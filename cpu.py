@@ -46,6 +46,21 @@ class CPU:
 
         self.stack_pointer = 7
 
+        """
+        The flags register `FL` holds the current flags status. These flags
+        can change based on the operands given to the `CMP` opcode.
+
+        The register is made up of 8 bits. If a particular bit is set, that flag is "true".
+
+        `FL` bits: `00000LGE`
+
+        * `L` Less-than: during a `CMP`, set to 1 if registerA is less than registerB,
+        zero otherwise.
+        * `G` Greater-than: during a `CMP`, set to 1 if registerA is greater than
+        registerB, zero otherwise.
+        * `E` Equal: during a `CMP`, set to 1 if registerA is equal to registerB, zero
+        otherwise.
+        """
         self.flag = [0] * 8
 
         # Dispatch table for fast lookups
@@ -63,10 +78,10 @@ class CPU:
         self.dispatch[MUL] = self.dis_MUL
         self.dispatch[ADD] = self.dis_ADD
 
-        # self.dispatch[CMP] = self.dis_CMP
-        # self.dispatch[JMP] = self.dis_JMP
-        # self.dispatch[JEQ] = self.dis_JEQ
-        # self.dispatch[JNE] = self.dis_JNE
+        self.dispatch[CMP] = self.dis_CMP
+        self.dispatch[JMP] = self.dis_JMP
+        self.dispatch[JEQ] = self.dis_JEQ
+        self.dispatch[JNE] = self.dis_JNE
 
     def ram_read(self, MAR):
         """
@@ -178,13 +193,69 @@ class CPU:
     # Sprint Challenge Opcode Functions, Compare, Jump to register,
     # Jump if E Flag set, Jump if not E flag set
 
-    # def dis_CMP(self, IR, operand_a, operand_b):
+    def dis_CMP(self, IR, operand_a, operand_b):
+        """
+        `CMP registerA registerB`
+        Compare the values in two registers.
+        * If they are equal, set the Equal `E` flag to 1, otherwise set it to 0.
+        * If registerA is less than registerB, set the Less-than `L` flag to 1,
+        otherwise set it to 0.
+        * If registerA is greater than registerB, set the Greater-than `G` flag
+        to 1, otherwise set it to 0.
 
-    # def dis_JMP(self, IR, operand_a, operand_b):
+        """
+        comp_a = self.registers[operand_a]
+        comp_b = self.registers[operand_b]
 
-    # def dis_JEQ(self, IR, operand_a, operand_b):
+        """
+        FL bits: 00000LGE
+        L Less-than: during a CMP, set to 1 if registerA is less than registerB, zero otherwise.
+        G Greater-than: during a CMP, set to 1 if registerA is greater than registerB, zero otherwise.
+        E Equal: during a CMP, set to 1 if registerA is equal to registerB, zero otherwise.     
+        """
+        if comp_a < comp_b:
+            self.flag[-3] = 1
+        if comp_a > comp_b:
+            self.flag[-2] = 1
+        if comp_a == comp_b:
+            self.flag[-1] = 1
 
-    # def dis_JNE(self, IR, operand_a, operand_b):
+    def dis_JMP(self, IR, operand_a, operand_b):
+        """
+        `JMP register`
+        Jump to the address stored in the given register.
+        Set the `PC` to the address stored in the given register.
+        """
+        self.pc = self.registers[operand_a]
+
+    def dis_JEQ(self, IR, operand_a, operand_b):
+        """
+        `JEQ register`
+        If `equal` flag is set (true), jump to the address stored in the given register.
+        """
+        # if last flag-equality is true
+        if self.flag[-1] == 1:
+            # then jump
+            self.pc = self.registers[operand_a]
+        # else increment by instruction length protocol
+        else:
+            IR = self.memory[self.pc]
+            instruction_length = ((IR >> 6) & 0b11) + 1
+            self.pc += instruction_length
+
+    def dis_JNE(self, IR, operand_a, operand_b):
+        """
+        `JNE register`
+        If `E` flag is clear (false, 0), jump to the address stored in the given
+        register.
+        """
+        if self.flag[-1] == 0:
+            self.pc = self.registers[operand_a]
+        # else increment by instruction length protocol
+        else:
+            IR = self.memory[self.pc]
+            instruction_length = ((IR >> 6) & 0b11) + 1
+            self.pc += instruction_length
 
     def alu(self, op, reg_a, reg_b):
         """
@@ -252,7 +323,6 @@ class CPU:
         while self.running:
             # read memory address stored in Program Counter (pc)
             # store result in Instruction Register (IR)
-            # IR = self.ram_read(self.pc)
             IR = self.memory[self.pc]
             # separate the opcodes from operands a and operands b
             operand_a = self.ram_read(self.pc + 1)  # operand_a is the next
